@@ -42,6 +42,15 @@ public class ModuleProject extends ProjectImpl {
 
         // Project structure validation
 
+        //// If module build, check module directory exists.
+        if (!options.buildAll) {
+            Path modulePath = this.sourceRootPath.resolve(ProjectDirConstants.SOURCE_DIR_NAME)
+                    .resolve(this.options.argList.get(0));
+            if (!(modulePath.toFile().exists() && modulePath.toFile().isDirectory())) {
+                throw new ModuleNotFoundException();
+            }
+        }
+
         //// Validate and set the path of the source root.
         if (!ProjectDirs.isProject(this.sourceRootPath)) {
             Path findRoot = ProjectDirs.findProjectRoot(this.sourceRootPath);
@@ -56,14 +65,6 @@ public class ModuleProject extends ProjectImpl {
         if (!RepoUtils.isBallerinaProject(this.sourceRootPath)) {
             throw new InvalidBallerinaProjectException(
                     "you are trying to build/compile a module that is not inside a project.");
-        }
-
-        //// If module build, check module directory exists.
-        if (!options.buildAll) {
-            Path modulePath = this.sourceRootPath.resolve(ProjectDirConstants.SOURCE_DIR_NAME).resolve(this.options.argList.get(0));
-            if (!(modulePath.toFile().exists() && modulePath.toFile().isDirectory())) {
-                throw new ModuleNotFoundException();
-            }
         }
     }
 

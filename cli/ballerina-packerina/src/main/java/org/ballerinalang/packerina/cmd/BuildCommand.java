@@ -187,26 +187,6 @@ public class BuildCommand implements BLauncherCmd {
     private boolean observabilityIncluded;
 
     public void execute() {
-        org.ballerinalang.project.CompilerOptions compilerOptions = new org.ballerinalang.project.CompilerOptions(
-                argList, sourceRoot, buildAll);
-        Project project;
-        try {
-            project = new ProjectImpl().loadProject(this.sourceRootPath, compilerOptions);
-        } catch (NotRegularBalFileException | BalFileNotFoundException | InvalidBallerinaProjectException e) {
-            CommandUtil.printError(this.errStream, e.getMessage(), null, false);
-            CommandUtil.exitError(this.exitWhenFinish);
-            return;
-        } catch (ModuleNotFoundException e) {
-            CommandUtil.printError(this.errStream,
-                    "invalid Ballerina source path. It should either be a name of a module in a " +
-                            "Ballerina project or a file with a \'" + BLangConstants.BLANG_SRC_FILE_SUFFIX +
-                            "\' extension. Use -a or --all " +
-                            "to build or compile all modules.",
-                    "ballerina build {<ballerina-file> | <module-name> | -a | --all}",
-                    true);
-            CommandUtil.exitError(this.exitWhenFinish);
-            return;
-        }
 
         if (this.helpFlag) {
             String commandUsageInfo = BLauncherCmd.getCommandUsageInfo(BUILD_COMMAND);
@@ -252,6 +232,28 @@ public class BuildCommand implements BLauncherCmd {
                 Paths.get(this.sourceRoot).toAbsolutePath() : this.sourceRootPath;
         Path sourcePath = null;
         Path targetPath;
+
+        // Create project.
+        org.ballerinalang.project.CompilerOptions compilerOptions = new org.ballerinalang.project.CompilerOptions(
+                argList, sourceRoot, buildAll);
+        Project project;
+        try {
+            project = new ProjectImpl().loadProject(this.sourceRootPath, compilerOptions);
+        } catch (NotRegularBalFileException | BalFileNotFoundException | InvalidBallerinaProjectException e) {
+            CommandUtil.printError(this.errStream, e.getMessage(), null, false);
+            CommandUtil.exitError(this.exitWhenFinish);
+            return;
+        } catch (ModuleNotFoundException e) {
+            CommandUtil.printError(this.errStream,
+                    "invalid Ballerina source path. It should either be a name of a module in a " +
+                            "Ballerina project or a file with a \'" + BLangConstants.BLANG_SRC_FILE_SUFFIX +
+                            "\' extension. Use -a or --all " +
+                            "to build or compile all modules.",
+                    "ballerina build {<ballerina-file> | <module-name> | -a | --all}",
+                    true);
+            CommandUtil.exitError(this.exitWhenFinish);
+            return;
+        }
 
         // When -a or --all is provided, check if the command is executed within a Ballerina project. Update source
         // root path if the command is executed inside a project.
