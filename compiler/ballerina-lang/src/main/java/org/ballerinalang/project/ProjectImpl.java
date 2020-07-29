@@ -31,6 +31,11 @@ import org.wso2.ballerinalang.compiler.util.ProjectDirs;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+/**
+ * Implementation of the Project.
+ *
+ * @since 2.0.0
+ */
 public class ProjectImpl implements Project {
 
      Path sourceRootPath;
@@ -47,11 +52,15 @@ public class ProjectImpl implements Project {
                 && options.argList.get(0).endsWith(BLangConstants.BLANG_SRC_FILE_SUFFIX)) {
             // get ballerina project root path
             Path findRoot = ProjectDirs.findProjectRoot(sourceRootPath.resolve(options.argList.get(0)));
-            // unable to find ballerina project root path
-            if (null == findRoot) {
-                return new SingleFileProject(sourceRootPath.resolve(options.argList.get(0)), options);
+
+            // found ballerina root path & valid project structure
+            if (isValidProjectStructure(findRoot, sourceRootPath, options.argList.get(0))) {
+                return new ModuleProject(findRoot, options);
             }
+            // else consider it as single bal file
+            return new SingleFileProject(sourceRootPath.resolve(options.argList.get(0)), options);
         }
+        // else ballerina project
         return new ModuleProject(sourceRootPath, options);
     }
 
@@ -108,5 +117,18 @@ public class ProjectImpl implements Project {
     @Override
     public Path getSourcePath() {
         return null;
+    }
+
+    private boolean isValidProjectStructure(Path findRoot, Path sourceRootPath, String argsPath) {
+        if (findRoot != null) {
+            Path modulePath = sourceRootPath.resolve(argsPath).getParent();
+            if (modulePath != null) {
+                Path projectPath = modulePath.getParent();
+                if (projectPath != null) {
+                    return projectPath == findRoot;
+                }
+            }
+        }
+        return false;
     }
 }

@@ -18,5 +18,10 @@
 
 package org.ballerinalang.project;
 
+/**
+ * Module Resolver.
+ *
+ * @since 2.0.0
+ */
 public interface ModuleResolver {
 }

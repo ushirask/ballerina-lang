@@ -18,5 +18,10 @@
 
 package org.ballerinalang.project;
 
+/**
+ * Defines `ballerina.lock` file manager.
+ *
+ * @since 2.0.0
+ */
 public interface LockManager {
 }

@@ -18,5 +18,10 @@
 
 package org.ballerinalang.project;
 
+/**
+ * Implementation of the `Ballerina.toml`.
+ *
+ * @since 2.0.0
+ */
 public interface Toml {
 }

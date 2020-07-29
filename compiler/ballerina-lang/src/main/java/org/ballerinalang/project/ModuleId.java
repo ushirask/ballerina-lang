@@ -18,6 +18,11 @@
 
 package org.ballerinalang.project;
 
+/**
+ * Implementation of the Module ID.
+ *
+ * @since 2.0.0
+ */
 public class ModuleId {
     private String orgName;
     private String moduleName;

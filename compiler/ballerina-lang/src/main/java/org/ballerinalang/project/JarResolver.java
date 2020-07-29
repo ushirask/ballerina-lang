@@ -18,5 +18,10 @@
 
 package org.ballerinalang.project;
 
+/**
+ * Defines jar resolver.
+ *
+ * @since 2.0.0
+ */
 public interface JarResolver {
 }

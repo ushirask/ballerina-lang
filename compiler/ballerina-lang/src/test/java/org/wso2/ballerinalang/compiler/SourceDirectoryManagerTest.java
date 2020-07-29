@@ -17,8 +17,8 @@ package org.wso2.ballerinalang.compiler;
 
 import org.ballerinalang.compiler.CompilerOptionName;
 import org.ballerinalang.model.elements.PackageID;
-import org.ballerinalang.project.exceptions.InvalidModuleException;
 import org.ballerinalang.project.Project;
+import org.ballerinalang.project.exceptions.InvalidModuleException;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;

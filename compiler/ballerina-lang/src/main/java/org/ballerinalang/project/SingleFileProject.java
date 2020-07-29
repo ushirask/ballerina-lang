@@ -25,6 +25,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+/**
+ * Implementation of the single bal file project.
+ *
+ * @since 2.0.0
+ */
 public class SingleFileProject extends ProjectImpl {
     private Path sourcePath;
 
@@ -37,8 +42,7 @@ public class SingleFileProject extends ProjectImpl {
         // check if path given is an absolute path. update source root accordingly.
         if (Paths.get(this.options.argList.get(0)).isAbsolute()) {
             this.sourcePath = Paths.get(this.options.argList.get(0));
-        }
-        else {
+        } else {
             this.sourcePath = this.sourceRootPath;
         }
         this.sourceRootPath = this.sourcePath.getParent();

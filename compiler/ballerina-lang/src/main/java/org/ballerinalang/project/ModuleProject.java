@@ -30,6 +30,11 @@ import java.nio.file.Path;
 
 import static org.wso2.ballerinalang.compiler.util.ProjectDirConstants.SOURCE_DIR_NAME;
 
+/**
+ * Implementation of the module project.
+ *
+ * @since 2.0.0
+ */
 public class ModuleProject extends ProjectImpl {
 
     Manifest manifest;

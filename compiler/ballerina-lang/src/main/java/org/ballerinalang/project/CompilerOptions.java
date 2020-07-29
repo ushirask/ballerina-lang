@@ -20,6 +20,11 @@ package org.ballerinalang.project;
 
 import java.util.List;
 
+/**
+ * Defines compiler options.
+ *
+ * @since 2.0.0
+ */
 public class CompilerOptions {
     List<String> argList;
     String sourceRoot;

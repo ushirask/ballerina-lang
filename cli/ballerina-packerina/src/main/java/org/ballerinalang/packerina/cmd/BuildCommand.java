@@ -337,11 +337,10 @@ public class BuildCommand implements BLauncherCmd {
             sourcePath = Paths.get(moduleName);
 
             //// check if module exists.
-            if (Files.notExists(project.getSourceRootPath().resolve(ProjectDirConstants.SOURCE_DIR_NAME).resolve(sourcePath))) {
-                CommandUtil.printError(this.errStream,
-                        "'" + sourcePath + "' module does not exist.",
-                        "ballerina build [-c] <module-name>",
-                        true);
+            if (Files.notExists(
+                    project.getSourceRootPath().resolve(ProjectDirConstants.SOURCE_DIR_NAME).resolve(sourcePath))) {
+                CommandUtil.printError(this.errStream, "'" + sourcePath + "' module does not exist.",
+                        "ballerina build [-c] <module-name>", true);
                 CommandUtil.exitError(this.exitWhenFinish);
                 return;
             }
