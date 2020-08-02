@@ -143,6 +143,7 @@ public enum NodeKind {
     FORK_JOIN,
     IF,
     MATCH,
+    MATCH_STATEMENT,
     MATCH_TYPED_PATTERN_CLAUSE,
     MATCH_STATIC_PATTERN_CLAUSE,
     MATCH_STRUCTURED_PATTERN_CLAUSE,
@@ -184,6 +185,16 @@ public enum NodeKind {
     LIMIT,
     ORDER_BY,
     ORDER_KEY,
+    MATCH_CLAUSE,
+
+    /* Match patterns */
+    CONST_MATCH_PATTERN,
+    WILDCARD_MATCH_PATTERN,
+    VAR_BINDING_PATTERN_MATCH_PATTERN,
+
+    /* Binding patterns*/
+    CAPTURE_BINDING_PATTERN,
+    LIST_BINDING_PATTERN,
 
     /* Types */
     ARRAY_TYPE,
