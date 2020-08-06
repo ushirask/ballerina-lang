@@ -27,6 +27,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
 
+import static org.ballerinalang.tool.LauncherUtils.createLauncherException;
+
 /**
  * Packerina command util.
  *
@@ -122,4 +124,14 @@ public class CommandUtil {
 
     }
 
+    public static void checkGraalVmInstalled() {
+        try {
+            ProcessBuilder pb = new ProcessBuilder("native-image", "--version");
+            Process process = pb.start();
+            process.waitFor();
+        } catch (IOException | InterruptedException e) {
+            throw createLauncherException("GraalVM native-image command not found. Please install and configure " +
+                                                  "GraalVM.");
+        }
+    }
 }
