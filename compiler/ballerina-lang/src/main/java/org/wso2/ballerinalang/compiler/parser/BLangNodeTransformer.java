@@ -3483,6 +3483,7 @@ public class BLangNodeTransformer extends NodeTransformer<BLangNode> {
                 matchPattern.kind() == SyntaxKind.STRING_LITERAL ||
                 matchPattern.kind() == SyntaxKind.SIMPLE_NAME_REFERENCE ||
                 matchPattern.kind() == SyntaxKind.NULL_KEYWORD ||
+                matchPattern.kind() == SyntaxKind.NIL_LITERAL ||
                 matchPattern.kind() == SyntaxKind.TRUE_KEYWORD ||
                 matchPattern.kind() == SyntaxKind.FALSE_KEYWORD) {
             BLangConstPattern bLangConstMatchPattern =
