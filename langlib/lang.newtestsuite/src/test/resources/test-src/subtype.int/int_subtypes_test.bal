@@ -1113,4 +1113,3 @@ function testBitwiseXor() {
     int z = f ^ b;
     test:assertEquals(-1555, z);
 }
-

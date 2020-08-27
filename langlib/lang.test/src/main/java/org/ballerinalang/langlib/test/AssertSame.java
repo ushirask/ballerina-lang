@@ -21,27 +21,29 @@ package org.ballerinalang.langlib.test;
 import org.ballerinalang.jvm.BallerinaErrors;
 import org.ballerinalang.jvm.TypeChecker;
 import org.ballerinalang.jvm.scheduling.Strand;
-import org.ballerinalang.jvm.types.TypeTags;
 import org.ballerinalang.model.types.TypeKind;
 import org.ballerinalang.natives.annotations.Argument;
 import org.ballerinalang.natives.annotations.BallerinaFunction;
 
 import static org.ballerinalang.util.BLangCompilerConstants.TEST_VERSION;
 
+
 /**
- * Native implementation of assertNotError(any|error value, string message? = ()).
+ * Native implementation of assertSame(any|error actual, any|error expected, string message? = ()).
  *
  * @since 2.0.0
  */
 @BallerinaFunction(
-        orgName = "ballerina", packageName = "lang.test", version = TEST_VERSION, functionName = "assertNotError",
-        args = {@Argument(name = "value", type = TypeKind.UNION), @Argument(name = "message", type = TypeKind.UNION)},
+        orgName = "ballerina", packageName = "lang.test", version = TEST_VERSION, functionName = "assertSame",
+        args = {@Argument(name = "actual", type = TypeKind.UNION),
+                @Argument(name = "expected", type = TypeKind.UNION),
+                @Argument(name = "message", type = TypeKind.UNION)},
         isPublic = true
 )
-public class AssertNotError {
-    public static void assertNotError(Strand strand, Object value, Object message) {
-        if (TypeChecker.getType(value).getTag() == TypeTags.ERROR_TAG) {
-            String msg = " expected a non-error type";
+public class AssertSame {
+    public static void assertSame(Strand strand, Object actual, Object expected, Object message) {
+        if (!TypeChecker.isReferenceEqual(expected, actual)) {
+            String msg = "expected: [" + expected.hashCode() + "] but found: [" + actual.hashCode() + "]";
             msg = message != null ? message.toString() + msg : msg;
             strand.setProperty(NativeImpConstants.STRAND_PROPERTY_NAME,
                     BallerinaErrors.createError(NativeImpConstants.TEST_FAIL_REASON, msg));

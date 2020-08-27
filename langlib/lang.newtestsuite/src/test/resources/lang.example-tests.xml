@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-group name="test suite example">
+    <description>examples test</description>
+    <test name="example-test">
+        <description>example test</description>
+        <source>
+            <file>test-src/example_test.bal</file>
+        </source>
+        <steps>
+            <run>
+                <callFunction name="testFromString">
+                    <parameters>
+                        <string>504023030303030303030.3030303</string>
+                    </parameters>
+                    <assert>
+                        <return>
+                            <decimal>504023030303030303030.3030303</decimal>
+                        </return>
+                    </assert>
+                </callFunction>
+                <callFunction name="concat">
+                    <parameters>
+                        <string>hello</string>
+                        <arrayValue>
+                            <string> ballerina, swan, lake</string>
+                        </arrayValue>
+                    </parameters>
+                    <assert>
+                        <return>
+                            <string>hello ballerina swan lake</string>
+                        </return>
+                    </assert>
+                </callFunction>
+                <callFunction name="testFail">
+                    <assert>
+                        <error>error {ballerina/lang.test}AssertionError message= failed</error>
+                    </assert>
+                </callFunction>
+                <callFunction name="testAbs">
+                    <assert>
+                        <return>
+                            <decimal>100.1</decimal>
+                        </return>
+                    </assert>
+                </callFunction>
+                <callFunction name="testValueAssignment"/>
+                <callFunction name="sum">
+                    <parameters>
+                        <int>10</int>
+                    </parameters>
+                    <assert>
+                        <return>
+                            <int>20</int>
+                        </return>
+                    </assert>
+                    <parameters>
+                        <int>2</int>
+                    </parameters>
+                    <assert>
+                        <return>
+                            <int>12</int>
+                        </return>
+                    </assert>
+                </callFunction>
+            </run>
+        </steps>
+    </test>
+</test-group>

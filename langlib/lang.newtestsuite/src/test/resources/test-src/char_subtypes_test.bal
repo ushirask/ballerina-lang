@@ -137,4 +137,3 @@ function insertMapValue(map<string> m, string key, string value) {
 function updateRecord(record { string i;} rec, string value) {
     rec.i = value;
 }
-

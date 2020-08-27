@@ -19,9 +19,7 @@
 package org.ballerinalang.langlib.test;
 
 import org.ballerinalang.jvm.BallerinaErrors;
-import org.ballerinalang.jvm.TypeChecker;
 import org.ballerinalang.jvm.scheduling.Strand;
-import org.ballerinalang.jvm.types.TypeTags;
 import org.ballerinalang.model.types.TypeKind;
 import org.ballerinalang.natives.annotations.Argument;
 import org.ballerinalang.natives.annotations.BallerinaFunction;
@@ -29,23 +27,21 @@ import org.ballerinalang.natives.annotations.BallerinaFunction;
 import static org.ballerinalang.util.BLangCompilerConstants.TEST_VERSION;
 
 /**
- * Native implementation of assertNotError(any|error value, string message? = ()).
+ * Native implementation of fails(string message? = ()).
  *
  * @since 2.0.0
  */
 @BallerinaFunction(
-        orgName = "ballerina", packageName = "lang.test", version = TEST_VERSION, functionName = "assertNotError",
-        args = {@Argument(name = "value", type = TypeKind.UNION), @Argument(name = "message", type = TypeKind.UNION)},
+        orgName = "ballerina", packageName = "lang.test", version = TEST_VERSION, functionName = "fails",
+        args = {@Argument(name = "message", type = TypeKind.UNION)},
         isPublic = true
 )
-public class AssertNotError {
-    public static void assertNotError(Strand strand, Object value, Object message) {
-        if (TypeChecker.getType(value).getTag() == TypeTags.ERROR_TAG) {
-            String msg = " expected a non-error type";
-            msg = message != null ? message.toString() + msg : msg;
-            strand.setProperty(NativeImpConstants.STRAND_PROPERTY_NAME,
-                    BallerinaErrors.createError(NativeImpConstants.TEST_FAIL_REASON, msg));
-            throw BallerinaErrors.createError(NativeImpConstants.TEST_FAIL_REASON, msg);
-        }
+public class Fail {
+    public static void fails(Strand strand, Object message) {
+        String msg = " failed";
+        msg = message != null ? message.toString() + msg : msg;
+        strand.setProperty(NativeImpConstants.STRAND_PROPERTY_NAME,
+                BallerinaErrors.createError(NativeImpConstants.TEST_FAIL_REASON, msg));
+        throw BallerinaErrors.createError(NativeImpConstants.TEST_FAIL_REASON, msg);
     }
 }

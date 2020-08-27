@@ -16,26 +16,58 @@
 
 # Tests value equality for two values.
 #
-# + expected - expected value
 # + actual - actual value
-public function assertValueEqual(anydata expected, anydata actual) = external;
+# + expected - expected value
+# + message - Assertion error message
+public function assertEquals(anydata actual, anydata expected, string? message = ()) = external;
 
 # Tests whether a value is of type 'error'.
 #
 # + value - the passed value to be asserted
-public function assertError(any|error value) = external;
+# + expectedErrorMessage - Expected error message
+# + message - Assertion error message
+public function assertError(any|error value, string? expectedErrorMessage = (), string? message = ()) = external;
 
 # Tests whether a value is of a non-error type.
 #
 # + value - the passed value to be asserted
-public function assertNotError(any|error value) = external;
+# + message - Assertion error message
+public function assertNotError(any|error value, string? message = ()) = external;
 
 # Tests whether a value is 'true'.
 #
 # + value - the passed value to be asserted
-public function assertTrue(boolean value) = external;
+# + message - Assertion error message
+public function assertTrue(boolean value, string? message = ()) = external;
 
 # Tests whether a value is 'false'.
 #
 # + value - the passed value to be asserted
-public function assertFalse(boolean value) = external;
+# + message - Assertion error message
+public function assertFalse(boolean value, string? message = ()) = external;
+
+# Tests two objects refer to the same object.
+#
+# + actual - the passed value to be asserted
+# + expected - expected value
+# + message - Assertion error message
+public function assertSame(any|error actual, any|error expected, string? message = ()) = external;
+
+# Asserts that two objects do not refer to the same object.
+#
+# + actual - the passed value to be asserted
+# + expected - expected value
+# + message - Assertion error message
+public function assertNotSame(any|error actual, any|error expected, string? message = ()) = external;
+
+# Assert failure is triggered based on user discretion. AssertError is thrown with the given errorMessage.
+#
+# + message - Assertion error message
+public function fails(string? message = ()) = external;
+
+# Tests value inequality for two values.
+#
+# + actual - actual value
+# + expected - expected value
+# + message - Assertion error message
+public function assertNotEquals(anydata actual, anydata expected, string? message = ()) = external;

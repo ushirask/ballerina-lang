@@ -27,20 +27,24 @@ import org.ballerinalang.natives.annotations.BallerinaFunction;
 import static org.ballerinalang.util.BLangCompilerConstants.TEST_VERSION;
 
 /**
- * Native implementation of assertTrue(boolean value).
+ * Native implementation of assertTrue(boolean condition, string message? = ()).
  *
- * @since 1.3.0
+ * @since 2.0.0
  */
 @BallerinaFunction(
         orgName = "ballerina", packageName = "lang.test", version = TEST_VERSION, functionName = "assertTrue",
-        args = {@Argument(name = "value", type = TypeKind.BOOLEAN)},
+        args = {@Argument(name = "value", type = TypeKind.BOOLEAN),
+                @Argument(name = "message", type = TypeKind.UNION)},
         isPublic = true
 )
 public class AssertTrue {
-    public static void assertTrue(Strand strand, boolean value) {
+    public static void assertTrue(Strand strand, boolean value, Object message) {
         if (!value) {
-            throw BallerinaErrors.createError("{ballerina/lang.test}AssertionError",
-                    "expected a true value");
+            String msg = " expected a true value";
+            msg = message != null ? message.toString() + msg : msg;
+            strand.setProperty(NativeImpConstants.STRAND_PROPERTY_NAME,
+                    BallerinaErrors.createError(NativeImpConstants.TEST_FAIL_REASON, msg));
+            throw BallerinaErrors.createError(NativeImpConstants.TEST_FAIL_REASON, msg);
         }
     }
 }

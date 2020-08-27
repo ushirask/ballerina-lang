@@ -92,6 +92,7 @@ import org.wso2.ballerinalang.compiler.tree.expressions.BLangExpression;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangLiteral;
 import org.wso2.ballerinalang.compiler.util.BArrayState;
 
+import java.io.PrintStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -116,6 +117,11 @@ import static org.wso2.ballerinalang.compiler.util.Names.DEFAULT_VERSION;
  * @since 0.94
  */
 public class BRunUtil {
+    private static final PrintStream outStream = System.out;
+    public static final String TEST_PASS_STATUS = "passed";
+    public static final String TEST_FAILED_STATUS = "failed";
+    public static final String TEST_FAILED_MSG = "lang.test.state.failMsg";
+    public static final String ERROR_PREFIX = "org.ballerinalang.util.exceptions.BLangRuntimeException: ";
 
     public static final String IS_STRING_VALUE_PROP = "ballerina.bstring";
 
@@ -1214,5 +1220,106 @@ public class BRunUtil {
     public static Object invokeAndGetJVMResult(CompileResult compileResult, String functionName) {
         BIRNode.BIRFunction function = getInvokedFunction(compileResult, functionName);
         return invoke(compileResult, function, functionName, new BValue[0], new Class<?>[0]);
+    }
+
+    public static Object[] cInvoke(CompileResult compileResult, String functionName, Object[] args, boolean panicFlag) {
+        Object[] jvmResult = new Object[2];
+        BIRNode.BIRFunction function = null;
+        //if the function name is invalid, mark it as failed
+        try {
+            function = getInvokedFunction(compileResult, functionName);
+        } catch (RuntimeException e) {
+            outStream.println(functionName + " -> failed! \n" + e.getMessage());
+            jvmResult[1] = TEST_FAILED_STATUS;
+            jvmResult[0] = e.getMessage();
+        }
+        if (function != null) {
+            args = addDefaultableBoolean(args);
+            jvmResult = cInvoke(compileResult, function, functionName, args, panicFlag);
+        }
+        return jvmResult;
+    }
+
+    private static Object[] cInvoke(CompileResult compileResult, BIRNode.BIRFunction function, String functionName,
+                                    Object[] args, boolean panicFlag) {
+        Object[] jvmArgs = new Object[args.length + 1];
+
+        for (int i = 0; i < args.length; i++) {
+            jvmArgs[i + 1] = args[i];
+        }
+
+        Object[] jvmResult = new Object[2];
+        BIRNode.BIRPackage birPackage = ((BLangPackage) compileResult.getAST()).symbol.bir;
+        String funcClassName = BFileUtil.getQualifiedClassName(birPackage.org.value, birPackage.name.value,
+                birPackage.version.value, getClassName(function.pos.src.cUnitName));
+        try {
+            Class<?> funcClass = compileResult.getClassLoader().loadClass(funcClassName);
+            Method method = getMethod(functionName, funcClass);
+            Function<Object[], Object> func = a -> {
+                try {
+                    return method.invoke(null, a);
+                } catch (IllegalAccessException e) {
+                    throw new RuntimeException("Error while invoking function '" + functionName + "'", e);
+                } catch (InvocationTargetException e) {
+                    Throwable t = e.getTargetException();
+                    if (t instanceof BLangRuntimeException) {
+                        throw new org.ballerinalang.util.exceptions.BLangRuntimeException(t.getMessage());
+                    }
+                    if (t instanceof ErrorValue) {
+                        throw new org.ballerinalang.util.exceptions
+                                .BLangRuntimeException("error: " + ((ErrorValue) t).getPrintableStackTrace());
+                    }
+                    if (t instanceof StackOverflowError) {
+                        throw new org.ballerinalang.util.exceptions.BLangRuntimeException("error: " +
+                                "{ballerina}StackOverflow {\"message\":\"stack overflow\"}");
+                    }
+                    throw new RuntimeException("Error while invoking function '" + functionName + "'", e);
+                }
+            };
+
+            Scheduler scheduler = new Scheduler(false);
+            FutureValue futureValue = scheduler.schedule(jvmArgs, func, null, null, new HashMap<>(),
+                                                         org.ballerinalang.jvm.types.BTypes.typeAny, "test",
+                                                         new StrandMetadata(ANON_ORG, DOT, DEFAULT_VERSION.value,
+                                                         functionName));
+            scheduler.start();
+            Object errorMsg = futureValue.strand.getProperty(TEST_FAILED_MSG);
+            jvmResult[0] = futureValue.result;
+            jvmResult[1] = TEST_FAILED_STATUS;
+            if (!panicFlag) {
+                jvmResult[1] = TEST_PASS_STATUS;
+                if (errorMsg != null) {
+                    jvmResult[0] = errorMsg.toString();
+                } else if (futureValue.panic != null) {
+                    jvmResult[0] = getPanicError(futureValue.panic.toString());
+                }
+            } else if (futureValue.panic instanceof RuntimeException) {
+                jvmResult[0] = getFormattedErrorMessage(futureValue);
+                outStream.println(funcClassName + "-> " + functionName + " failed! \n" + jvmResult[0]);
+            } else {
+                jvmResult[1] = TEST_PASS_STATUS;
+            }
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
+            throw new RuntimeException("Error while invoking function '" + functionName + "'", e);
+        }
+        return jvmResult;
+    }
+
+    public static String getPanicError(String panicError) {
+        if (panicError.contains("\n")) {
+            panicError = panicError.substring(0, panicError.indexOf("\n"));
+        }
+        if (panicError.contains(ERROR_PREFIX)) {
+            panicError = panicError.replace(ERROR_PREFIX, "");
+        }
+        return panicError;
+    }
+
+    public static String getFormattedErrorMessage(FutureValue futureValue) {
+        String errMsg = futureValue.panic.toString();
+        if (futureValue.getPanic().getCause() != null) {
+            errMsg = errMsg + "\n" + futureValue.getPanic().getCause().getCause().toString() + "\n";
+        }
+        return errMsg;
     }
 }
