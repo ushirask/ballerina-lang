@@ -157,6 +157,7 @@ import org.wso2.ballerinalang.compiler.tree.statements.BLangForkJoin;
 import org.wso2.ballerinalang.compiler.tree.statements.BLangIf;
 import org.wso2.ballerinalang.compiler.tree.statements.BLangLock;
 import org.wso2.ballerinalang.compiler.tree.statements.BLangMatch;
+import org.wso2.ballerinalang.compiler.tree.statements.BLangMatchStatement;
 import org.wso2.ballerinalang.compiler.tree.statements.BLangPanic;
 import org.wso2.ballerinalang.compiler.tree.statements.BLangRecordDestructure;
 import org.wso2.ballerinalang.compiler.tree.statements.BLangRecordVariableDef;
@@ -407,6 +408,11 @@ public class LSNodeVisitor extends BLangNodeVisitor {
 
     @Override
     public void visit(BLangMatch matchNode) {
+        // No implementation
+    }
+
+    @Override
+    public void visit(BLangMatchStatement matchStatement) {
         // No implementation
     }
 

@@ -24,6 +24,7 @@ import org.ballerinalang.model.tree.NodeKind;
 import org.ballerinalang.model.tree.TopLevelNode;
 import org.ballerinalang.model.tree.expressions.ExpressionNode;
 import org.ballerinalang.model.tree.statements.VariableDefinitionNode;
+import org.wso2.ballerinalang.compiler.semantics.model.symbols.BVarSymbol;
 import org.wso2.ballerinalang.compiler.tree.BLangAnnotation;
 import org.wso2.ballerinalang.compiler.tree.BLangAnnotationAttachment;
 import org.wso2.ballerinalang.compiler.tree.BLangBlockFunctionBody;
@@ -55,11 +56,13 @@ import org.wso2.ballerinalang.compiler.tree.BLangTypeDefinition;
 import org.wso2.ballerinalang.compiler.tree.BLangVariable;
 import org.wso2.ballerinalang.compiler.tree.BLangWorker;
 import org.wso2.ballerinalang.compiler.tree.BLangXMLNS;
+import org.wso2.ballerinalang.compiler.tree.bindingpatterns.BLangCaptureBindingPattern;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangDoClause;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangFromClause;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangJoinClause;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangLetClause;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangLimitClause;
+import org.wso2.ballerinalang.compiler.tree.clauses.BLangMatchClause;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangOnClause;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangOnConflictClause;
 import org.wso2.ballerinalang.compiler.tree.clauses.BLangOrderByClause;
@@ -96,6 +99,7 @@ import org.wso2.ballerinalang.compiler.tree.expressions.BLangMarkdownDocumentati
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangMarkdownParameterDocumentation;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangMarkdownReturnParameterDocumentation;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangMatchExpression;
+import org.wso2.ballerinalang.compiler.tree.expressions.BLangMatchGuard;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangNamedArgsExpression;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangNumericLiteral;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangQueryAction;
@@ -142,6 +146,9 @@ import org.wso2.ballerinalang.compiler.tree.expressions.BLangXMLQName;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangXMLQuotedString;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangXMLSequenceLiteral;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangXMLTextLiteral;
+import org.wso2.ballerinalang.compiler.tree.matchpatterns.BLangConstPattern;
+import org.wso2.ballerinalang.compiler.tree.matchpatterns.BLangVarBindingPatternMatchPattern;
+import org.wso2.ballerinalang.compiler.tree.matchpatterns.BLangWildCardMatchPattern;
 import org.wso2.ballerinalang.compiler.tree.statements.BLangAssignment;
 import org.wso2.ballerinalang.compiler.tree.statements.BLangBlockStmt;
 import org.wso2.ballerinalang.compiler.tree.statements.BLangBreak;
@@ -159,6 +166,7 @@ import org.wso2.ballerinalang.compiler.tree.statements.BLangMatch;
 import org.wso2.ballerinalang.compiler.tree.statements.BLangMatch.BLangMatchStaticBindingPatternClause;
 import org.wso2.ballerinalang.compiler.tree.statements.BLangMatch.BLangMatchStructuredBindingPatternClause;
 import org.wso2.ballerinalang.compiler.tree.statements.BLangMatch.BLangMatchTypedBindingPatternClause;
+import org.wso2.ballerinalang.compiler.tree.statements.BLangMatchStatement;
 import org.wso2.ballerinalang.compiler.tree.statements.BLangPanic;
 import org.wso2.ballerinalang.compiler.tree.statements.BLangRecordDestructure;
 import org.wso2.ballerinalang.compiler.tree.statements.BLangRecordVariableDef;
@@ -663,6 +671,63 @@ public class NodeCloner extends BLangNodeVisitor {
         source.cloneRef = clone;
         clone.expr = clone(source.expr);
         clone.patternClauses = cloneList(source.patternClauses);
+    }
+
+    @Override
+    public void visit(BLangMatchStatement source) {
+        BLangMatchStatement clone = new BLangMatchStatement();
+        source.cloneRef = clone;
+        clone.setExpression(source.getExpression());
+        clone.matchClauses = cloneList(source.matchClauses);
+    }
+
+    @Override
+    public void visit(BLangMatchClause source) {
+        BLangMatchClause clone = new BLangMatchClause();
+        source.cloneRef = clone;
+        clone.matchPatterns = cloneList(source.matchPatterns);
+        clone.setMatchGuard(source.getMatchGuard());
+        clone.setBlockStatement(source.getBLockStatement());
+        clone.expr = source.expr;
+    }
+
+    @Override
+    public void visit(BLangMatchGuard source) {
+        BLangMatchGuard clone = new BLangMatchGuard();
+        source.cloneRef = clone;
+        clone.setExpression(source.getExpression());
+    }
+
+    @Override
+    public void visit(BLangWildCardMatchPattern source) {
+        BLangWildCardMatchPattern clone = new BLangWildCardMatchPattern();
+        clone.matchExpr = source.matchExpr;
+        source.cloneRef = clone;
+    }
+
+    @Override
+    public void visit(BLangConstPattern source) {
+        BLangConstPattern clone = new BLangConstPattern();
+        source.cloneRef = clone;
+        clone.matchExpr = source.matchExpr;
+        clone.setExpression(source.getExpresion());
+    }
+
+    @Override
+    public void visit(BLangVarBindingPatternMatchPattern source) {
+        BLangVarBindingPatternMatchPattern clone = new BLangVarBindingPatternMatchPattern();
+        source.cloneRef = clone;
+        clone.matchExpr = source.matchExpr;
+        clone.matchGuardIsAvailable = source.matchGuardIsAvailable;
+        clone.setBindingPattern(source.getBindingPattern());
+    }
+
+    @Override
+    public void visit(BLangCaptureBindingPattern source) {
+        BLangCaptureBindingPattern clone = new BLangCaptureBindingPattern();
+        source.cloneRef = clone;
+        clone.setIdentifier(source.getIdentifier());
+        clone.symbol = (BVarSymbol) source.getSymbol();
     }
 
     @Override
