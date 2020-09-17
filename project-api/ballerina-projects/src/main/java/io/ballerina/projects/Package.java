@@ -2,6 +2,7 @@ package io.ballerina.projects;
 
 import io.ballerina.projects.model.BallerinaToml;
 
+import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,7 +25,7 @@ public class Package {
                 this.packageContext.moduleContext(moduleId), this);
     }
 
-    static Package from(PackageConfig packageConfig) {
+    public static Package from(PackageConfig packageConfig) {
         // TODO create package context here by giving the package config
         // do the same for modules and documents
         // il. package context creates modules contexts and modules context create document contexts
@@ -62,5 +63,9 @@ public class Package {
 
     public BallerinaToml ballerinaToml() {
         return this.packageContext.ballerinaToml();
+    }
+
+    public Path packagePath() {
+        return this.packageContext.packagePath();
     }
 }
