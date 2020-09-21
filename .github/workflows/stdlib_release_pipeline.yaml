@@ -13,7 +13,7 @@ jobs:
               uses: ballerina-platform/ballerina-action@master
               with:
                   args:
-                      run release
+                      run release --b7a.http.tracelog.console=true
               env:
                   WORKING_DIR: ./stdlib/release
                   GITHUB_TOKEN: ${{ secrets.BAL_BOT_PAT }}
