@@ -75,6 +75,8 @@ function releaseModule(Module module) returns boolean {
         }
     };
     request.setJsonPayload(payload);
+    io:println(payload);
+    io:println(apiPath);
     var result = httpClient->post(apiPath, request);
     if (result is error) {
         logAndPanicError("Error occurred while releasing the module: " + moduleName, result);

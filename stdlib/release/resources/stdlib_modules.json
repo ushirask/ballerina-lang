@@ -204,7 +204,7 @@
             "release": false
         },
         {
-            "name": "module-ballerinax-mysql-test",
+            "name": "module-ballerina-mysql-test",
             "version": "0.5.16",
             "branch": "master",
             "level": 7,
