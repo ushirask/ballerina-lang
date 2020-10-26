@@ -24,11 +24,12 @@ import org.ballerinalang.model.tree.NodeKind;
 import org.ballerinalang.model.tree.TopLevelNode;
 import org.ballerinalang.model.tree.expressions.RecordLiteralNode;
 import org.ballerinalang.util.diagnostic.DiagnosticCode;
-import org.wso2.ballerinalang.compiler.diagnostic.BallerinaDiagnosticLog;
+import org.wso2.ballerinalang.compiler.diagnostic.BLangDiagnosticLog;
 import org.wso2.ballerinalang.compiler.semantics.analyzer.cyclefind.GlobalVariableRefAnalyzer;
 import org.wso2.ballerinalang.compiler.semantics.model.SymbolEnv;
 import org.wso2.ballerinalang.compiler.semantics.model.SymbolTable;
 import org.wso2.ballerinalang.compiler.semantics.model.symbols.BInvokableSymbol;
+import org.wso2.ballerinalang.compiler.semantics.model.symbols.BObjectTypeSymbol;
 import org.wso2.ballerinalang.compiler.semantics.model.symbols.BSymbol;
 import org.wso2.ballerinalang.compiler.semantics.model.symbols.SymTag;
 import org.wso2.ballerinalang.compiler.semantics.model.symbols.Symbols;
@@ -235,7 +236,7 @@ public class DataflowAnalyzer extends BLangNodeVisitor {
     private final Names names;
     private SymbolEnv env;
     private SymbolTable symTable;
-    private BallerinaDiagnosticLog dlog;
+    private BLangDiagnosticLog dlog;
     private Types types;
     private Map<BSymbol, InitStatus> uninitializedVars;
     private Map<BSymbol, Set<BSymbol>> globalNodeDependsOn;
@@ -249,7 +250,7 @@ public class DataflowAnalyzer extends BLangNodeVisitor {
     private DataflowAnalyzer(CompilerContext context) {
         context.put(DATAFLOW_ANALYZER_KEY, this);
         this.symTable = SymbolTable.getInstance(context);
-        this.dlog = BallerinaDiagnosticLog.getInstance(context);
+        this.dlog = BLangDiagnosticLog.getInstance(context);
         this.types = Types.getInstance(context);
         this.symResolver = SymbolResolver.getInstance(context);
         this.names = Names.getInstance(context);
@@ -303,6 +304,7 @@ public class DataflowAnalyzer extends BLangNodeVisitor {
         pkgNode.getTestablePkgs().forEach(testablePackage -> visit((BLangPackage) testablePackage));
         this.globalVariableRefAnalyzer.analyzeAndReOrder(pkgNode, this.globalNodeDependsOn);
         this.globalVariableRefAnalyzer.populateFunctionDependencies(this.functionToDependency);
+        pkgNode.globalVariableDependencies = globalVariableRefAnalyzer.getGlobalVariablesDependsOn();
         checkUnusedImports(pkgNode.imports);
         pkgNode.completedPhases.add(CompilerPhase.DATAFLOW_ANALYZE);
     }
@@ -1202,7 +1204,7 @@ public class DataflowAnalyzer extends BLangNodeVisitor {
     }
 
     private void addFunctionToGlobalVarDependency(BSymbol dependent, BSymbol provider) {
-        if (dependent.kind != SymbolKind.FUNCTION) {
+        if (dependent.kind != SymbolKind.FUNCTION && !isGlobalVarSymbol(dependent)) {
             return;
         }
         if (isVariableOrConstant(provider) && !isGlobalVarSymbol(provider)) {
@@ -1875,25 +1877,29 @@ public class DataflowAnalyzer extends BLangNodeVisitor {
         BType exprType = expr.type;
 
         if (types.isSubTypeOfBaseType(exprType, TypeTags.OBJECT) &&
-                isFinalFieldInAllObjects(exprType, fieldAccess.field.value)) {
+                isFinalFieldInAllObjects(fieldAccess.pos, exprType, fieldAccess.field.value)) {
             dlog.error(fieldAccess.pos, DiagnosticCode.CANNOT_UPDATE_FINAL_OBJECT_FIELD, fieldAccess.field.value);
-            return;
         }
-
-        if (expr.getKind() != NodeKind.FIELD_BASED_ACCESS_EXPR) {
-            return;
-        }
-
-        checkFinalObjectFieldUpdate((BLangFieldBasedAccess) expr);
     }
 
-    private boolean isFinalFieldInAllObjects(BType type, String fieldName) {
+    private boolean isFinalFieldInAllObjects(DiagnosticPos pos, BType type, String fieldName) {
         if (type.tag == TypeTags.OBJECT) {
-            return Symbols.isFlagOn(((BObjectType) type).fields.get(fieldName).symbol.flags, Flags.FINAL);
+
+            BField field = ((BObjectType) type).fields.get(fieldName);
+            if (field != null) {
+                return Symbols.isFlagOn(field.symbol.flags, Flags.FINAL);
+            }
+
+            BObjectTypeSymbol objTypeSymbol = (BObjectTypeSymbol) type.tsymbol;
+            Name funcName = names.fromString(Symbols.getAttachedFuncSymbolName(objTypeSymbol.name.value, fieldName));
+            BSymbol funcSymbol = symResolver.resolveObjectMethod(pos, env, funcName, objTypeSymbol);
+
+            // Object member functions are inherently final
+            return funcSymbol != null;
         }
 
         for (BType memberType : ((BUnionType) type).getMemberTypes()) {
-            if (!isFinalFieldInAllObjects(memberType, fieldName)) {
+            if (!isFinalFieldInAllObjects(pos, memberType, fieldName)) {
                 return false;
             }
         }

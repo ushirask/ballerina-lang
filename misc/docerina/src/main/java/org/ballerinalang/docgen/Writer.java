@@ -28,6 +28,7 @@ import com.github.jknack.handlebars.io.ClassPathTemplateLoader;
 import com.github.jknack.handlebars.io.FileTemplateLoader;
 import org.apache.commons.lang3.StringUtils;
 import org.ballerinalang.docgen.docs.BallerinaDocConstants;
+import org.ballerinalang.docgen.generator.model.AbstractObjectPageContext;
 import org.ballerinalang.docgen.generator.model.AnnotationsPageContext;
 import org.ballerinalang.docgen.generator.model.ClassPageContext;
 import org.ballerinalang.docgen.generator.model.ClientPageContext;
@@ -115,7 +116,9 @@ public class Writer {
 
             handlebars.registerHelper("editDescription", (Helper<String>) (description, options) -> {
                 //remove anything with <pre> tag
-                String newDescription = description.replaceAll("<pre>(.|\\n)*?<\\/pre>", "");
+                String newDescription = description.replaceAll("<pre>(.|\\n)*?<\\/pre>", " ");
+                // replace \n with a space
+                newDescription = newDescription.replaceAll("\\n", " ");
                 // select only the first sentence
                 String[] splits = newDescription.split("\\. ", 2);
                 if (splits.length < 2) {
@@ -137,8 +140,9 @@ public class Writer {
                     page.getClass() == ModulePageContext.class);
 
             handlebars.registerHelper("addColon", (Helper<PageContext>) (page, options) ->
-                    page.getClass() == ClassPageContext.class || page.getClass() == RecordPageContext.class ||
-                    page.getClass() == ClientPageContext.class || page.getClass() == ListenerPageContext.class);
+                    page.getClass() == ClassPageContext.class || page.getClass() == AbstractObjectPageContext.class ||
+                    page.getClass() == RecordPageContext.class || page.getClass() == ClientPageContext.class ||
+                    page.getClass() == ListenerPageContext.class);
 
             handlebars.registerHelper("getType", (Helper<PageContext>) (page, options) -> {
                 if (page.getClass() == ClassPageContext.class) {

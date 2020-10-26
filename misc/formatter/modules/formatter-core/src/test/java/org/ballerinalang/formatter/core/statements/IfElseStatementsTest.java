@@ -21,7 +21,7 @@ import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.nio.file.Paths;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -43,12 +43,13 @@ public class IfElseStatementsTest extends FormatterTest {
     }
 
     @Override
-    public List<String> skipList() {
-        return Arrays.asList("if_else_statement_1.bal", "if_else_statement_2.bal", "if_else_statement_3.bal");
-    }
-
-    @Override
     public String getTestResourceDir() {
         return Paths.get("statements", "if-else").toString();
+    }
+
+    public List<String> skipList() {
+        ArrayList<String> skip = new ArrayList<>();
+        skip.add("if_else_statement_6.bal");
+        return skip;
     }
 }

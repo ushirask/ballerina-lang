@@ -28,7 +28,7 @@ import org.ballerinalang.model.tree.expressions.RecordLiteralNode;
 import org.ballerinalang.model.tree.expressions.XMLNavigationAccess;
 import org.ballerinalang.model.tree.statements.StatementNode;
 import org.ballerinalang.util.diagnostic.DiagnosticCode;
-import org.wso2.ballerinalang.compiler.diagnostic.BallerinaDiagnosticLog;
+import org.wso2.ballerinalang.compiler.diagnostic.BLangDiagnosticLog;
 import org.wso2.ballerinalang.compiler.semantics.model.Scope;
 import org.wso2.ballerinalang.compiler.semantics.model.SymbolEnv;
 import org.wso2.ballerinalang.compiler.semantics.model.SymbolTable;
@@ -221,6 +221,7 @@ import org.wso2.ballerinalang.util.Flags;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -254,15 +255,18 @@ public class CodeAnalyzer extends BLangNodeVisitor {
     private final SymbolResolver symResolver;
     private int loopCount;
     private int transactionCount;
+    private int retryCount;
     private boolean statementReturns;
     private boolean failureHandled;
     private boolean matchClauseReturns;
     private boolean lastStatement;
-    private boolean hasLastPattern = false;
+    private boolean errorThrown;
+    private boolean failVisited;
+    private boolean hasLastPatternInClause = false;
     private boolean withinLockBlock;
     private SymbolTable symTable;
     private Types types;
-    private BallerinaDiagnosticLog dlog;
+    private BLangDiagnosticLog dlog;
     private TypeChecker typeChecker;
     private Stack<WorkerActionSystem> workerActionSystemStack = new Stack<>();
     private Stack<Boolean> loopWithinTransactionCheckStack = new Stack<>();
@@ -271,6 +275,7 @@ public class CodeAnalyzer extends BLangNodeVisitor {
     private Stack<Boolean> transactionalFuncCheckStack = new Stack<>();
     private Stack<Boolean> returnWithinLambdaWrappingCheckStack = new Stack<>();
     private BLangTransaction innerTransactionBlock = null;
+    private BLangRetry innerRetryBlock = null;
     private BLangNode parent;
     private Names names;
     private SymbolEnv env;
@@ -302,7 +307,7 @@ public class CodeAnalyzer extends BLangNodeVisitor {
         context.put(CODE_ANALYZER_KEY, this);
         this.symTable = SymbolTable.getInstance(context);
         this.types = Types.getInstance(context);
-        this.dlog = BallerinaDiagnosticLog.getInstance(context);
+        this.dlog = BLangDiagnosticLog.getInstance(context);
         this.typeChecker = TypeChecker.getInstance(context);
         this.names = Names.getInstance(context);
         this.symResolver = SymbolResolver.getInstance(context);
@@ -312,6 +317,7 @@ public class CodeAnalyzer extends BLangNodeVisitor {
 
     private void resetFunction() {
         this.resetStatementReturns();
+        this.resetErrorThrown();
     }
 
     private void resetStatementReturns() {
@@ -320,6 +326,10 @@ public class CodeAnalyzer extends BLangNodeVisitor {
 
     private void resetLastStatement() {
         this.lastStatement = false;
+    }
+
+    private void resetErrorThrown() {
+        this.errorThrown = false;
     }
 
     public BLangPackage analyze(BLangPackage pkgNode) {
@@ -664,18 +674,31 @@ public class CodeAnalyzer extends BLangNodeVisitor {
         this.errorTypes.push(new LinkedHashSet<>());
         boolean failureHandled = this.failureHandled;
         this.checkStatementExecutionValidity(retryNode);
+        this.retryCount++;
         if (!this.failureHandled) {
             this.failureHandled = retryNode.onFailClause != null;
+        }
+        if (retryCount > 1) {
+            this.innerRetryBlock = retryNode;
         }
         retryNode.retrySpec.accept(this);
         retryNode.retryBody.accept(this);
         this.failureHandled = failureHandled;
-        retryNode.retryBodyReturns = this.returnWithinLambdaWrappingCheckStack.peek();
+        if (!this.returnWithinLambdaWrappingCheckStack.peek() && this.innerRetryBlock != null) {
+            retryNode.retryBodyReturns = this.innerRetryBlock.retryBodyReturns;
+        } else {
+            retryNode.retryBodyReturns = this.returnWithinLambdaWrappingCheckStack.peek();
+        }
         this.returnWithinLambdaWrappingCheckStack.pop();
         this.resetLastStatement();
+        this.resetErrorThrown();
         retryNode.retryBody.isBreakable = retryNode.onFailClause != null;
         analyzeOnFailClause(retryNode.onFailClause);
         this.errorTypes.pop();
+        this.retryCount--;
+        if (this.retryCount == 0) {
+            this.innerRetryBlock = null;
+        }
     }
 
     @Override
@@ -701,6 +724,9 @@ public class CodeAnalyzer extends BLangNodeVisitor {
         if (this.statementReturns) {
             this.dlog.error(stmt.pos, DiagnosticCode.UNREACHABLE_CODE);
             this.resetStatementReturns();
+        } else if (errorThrown) {
+            this.dlog.error(stmt.pos, DiagnosticCode.UNREACHABLE_CODE);
+            this.resetErrorThrown();
         }
         if (lastStatement) {
             this.dlog.error(stmt.pos, DiagnosticCode.UNREACHABLE_CODE);
@@ -771,7 +797,9 @@ public class CodeAnalyzer extends BLangNodeVisitor {
             this.withinTransactionScope = prevTxMode;
         }
         boolean ifStmtReturns = this.statementReturns;
+        boolean currentErrorThrown = this.errorThrown;
         this.resetStatementReturns();
+        this.resetErrorThrown();
         if (ifStmt.elseStmt != null) {
             if (independentBlocks) {
                 commitRollbackAllowed = true;
@@ -782,33 +810,41 @@ public class CodeAnalyzer extends BLangNodeVisitor {
                 commitRollbackAllowed = false;
             }
             this.statementReturns = ifStmtReturns && this.statementReturns;
+            this.errorThrown = currentErrorThrown && this.errorThrown;
         }
         analyzeExpr(ifStmt.expr);
     }
 
     @Override
     public void visit(BLangMatchStatement matchStatement) {
+        this.errorTypes.push(new LinkedHashSet<>());
         analyzeExpr(matchStatement.expr);
         if (!this.failureHandled) {
             this.failureHandled = matchStatement.onFailClause != null;
         }
         matchExprType = matchStatement.expr.type;
 
-        boolean matchStmtReturns = false;
+        boolean currentErrorThrown = this.errorThrown;
         this.matchClauseReturns = false;
+        this.hasLastPatternInClause = false;
+        boolean containsLastPatternInStatement = false;
+        boolean allClausesReturns = true;
         for (BLangMatchClause matchClause : matchStatement.matchClauses) {
+            this.resetErrorThrown();
             analyzeNode(matchClause, env);
-            matchStmtReturns = this.matchClauseReturns && matchClause.matchGuard == null && hasLastPattern;
+            allClausesReturns = allClausesReturns && this.matchClauseReturns;
+            containsLastPatternInStatement =
+                    containsLastPatternInStatement || (matchClause.matchGuard == null && this.hasLastPatternInClause);
         }
-        this.statementReturns = matchStmtReturns;
-        hasLastPattern = false;
+        this.statementReturns = allClausesReturns && containsLastPatternInStatement;
+        this.errorThrown = currentErrorThrown;
         analyzeOnFailClause(matchStatement.onFailClause);
     }
 
     @Override
     public void visit(BLangMatchClause matchClause) {
         for (BLangMatchPattern matchPattern : matchClause.matchPatterns) {
-            if (hasLastPattern && matchClause.matchGuard == null) {
+            if (this.hasLastPatternInClause && matchClause.matchGuard == null) {
                 dlog.error(matchPattern.pos, DiagnosticCode.MATCH_STMT_PATTERN_UNREACHABLE);
             }
             if (matchPattern.type == symTable.noType) {
@@ -817,7 +853,7 @@ public class CodeAnalyzer extends BLangNodeVisitor {
 
             this.isJSONContext = types.isJSONContext(matchExprType);
             analyzeNode(matchPattern, env);
-            matchPattern.isLastPattern = hasLastPattern;
+            matchPattern.isLastPattern = this.hasLastPatternInClause;
         }
 
         analyzeNode(matchClause.blockStmt, env);
@@ -831,20 +867,20 @@ public class CodeAnalyzer extends BLangNodeVisitor {
 
     @Override
     public void visit(BLangWildCardMatchPattern wildCardMatchPattern) {
-        hasLastPattern = wildCardMatchPattern.matchesAll = types.isAssignable(wildCardMatchPattern.matchExpr.type,
-                symTable.anyType);
+        this.hasLastPatternInClause = wildCardMatchPattern.matchesAll =
+                types.isAssignable(wildCardMatchPattern.matchExpr.type, symTable.anyType);
     }
 
     @Override
     public void visit(BLangVarBindingPatternMatchPattern varBindingPattern) {
         BLangBindingPattern bindingPattern = varBindingPattern.getBindingPattern();
         analyzeNode(bindingPattern, env);
-        hasLastPattern = hasLastPattern && !varBindingPattern.matchGuardIsAvailable;
+        this.hasLastPatternInClause = this.hasLastPatternInClause && !varBindingPattern.matchGuardIsAvailable;
     }
 
     @Override
     public void visit(BLangCaptureBindingPattern captureBindingPattern) {
-        hasLastPattern = true;
+        this.hasLastPatternInClause = true;
     }
 
     @Override
@@ -878,6 +914,7 @@ public class CodeAnalyzer extends BLangNodeVisitor {
         analyzeNode(patternClause.matchExpr, env);
         analyzeNode(patternClause.body, env);
         resetStatementReturns();
+        resetErrorThrown();
     }
 
     @Override
@@ -885,6 +922,7 @@ public class CodeAnalyzer extends BLangNodeVisitor {
         analyzeNode(patternClause.matchExpr, env);
         analyzeNode(patternClause.body, env);
         resetStatementReturns();
+        resetErrorThrown();
     }
 
     private void analyzeMatchedPatterns(BLangMatch matchStmt, boolean staticLastPattern,
@@ -903,6 +941,7 @@ public class CodeAnalyzer extends BLangNodeVisitor {
                 analyzeNode(patternClause.body, env);
                 matchStmtReturns = matchStmtReturns && this.statementReturns;
                 this.resetStatementReturns();
+                this.resetErrorThrown();
             }
             this.statementReturns = matchStmtReturns;
         }
@@ -1504,7 +1543,6 @@ public class CodeAnalyzer extends BLangNodeVisitor {
         this.resetLastStatement();
         this.loopWithinTransactionCheckStack.pop();
         analyzeExpr(whileNode.expr);
-        whileNode.body.isBreakable = whileNode.onFailClause != null;
         analyzeOnFailClause(whileNode.onFailClause);
         this.errorTypes.pop();
     }
@@ -1527,7 +1565,9 @@ public class CodeAnalyzer extends BLangNodeVisitor {
 
     @Override
     public void visit(BLangFail failNode) {
-        this.lastStatement = true;
+        this.checkStatementExecutionValidity(failNode);
+        this.failVisited = true;
+        this.errorThrown = true;
         analyzeExpr(failNode.expr);
         if (this.env.scope.owner.getKind() == SymbolKind.PACKAGE) {
             // Check at module level.
@@ -2227,6 +2267,7 @@ public class CodeAnalyzer extends BLangNodeVisitor {
         }
 
         Set<Object> names = new HashSet<>();
+        Set<Object> neverTypedKeys = new HashSet<>();
         BType type = recordLiteral.type;
         boolean isRecord = type.tag == TypeTags.RECORD;
         boolean isOpenRecord = isRecord && !((BRecordType) type).sealed;
@@ -2236,6 +2277,7 @@ public class CodeAnalyzer extends BLangNodeVisitor {
         boolean isInferredRecordForMapCET = isRecord && recordLiteral.expectedType != null &&
                 recordLiteral.expectedType.tag == TypeTags.MAP;
 
+        BLangRecordLiteral.BLangRecordSpreadOperatorField inclusiveTypeSpreadField = null;
         for (RecordLiteralNode.RecordField field : fields) {
 
             BLangExpression keyExpr;
@@ -2246,18 +2288,71 @@ public class CodeAnalyzer extends BLangNodeVisitor {
                 BLangExpression spreadOpExpr = spreadOpField.expr;
 
                 analyzeExpr(spreadOpExpr);
-                if (spreadOpExpr.type.tag != TypeTags.RECORD) {
+
+                BType spreadOpExprType = spreadOpExpr.type;
+                int spreadFieldTypeTag = spreadOpExprType.tag;
+                if (spreadFieldTypeTag == TypeTags.MAP) {
+                    if (inclusiveTypeSpreadField != null) {
+                        this.dlog.error(spreadOpExpr.pos, DiagnosticCode.MULTIPLE_INCLUSIVE_TYPES);
+                        continue;
+                    }
+                    inclusiveTypeSpreadField = spreadOpField;
+
+                    if (fields.size() > 1) {
+                        if (names.size() > 0) {
+                            this.dlog.error(spreadOpExpr.pos,
+                                            DiagnosticCode.SPREAD_FIELD_MAY_DULPICATE_ALREADY_SPECIFIED_KEYS,
+                                            spreadOpExpr);
+                        }
+                        // Skipping to avoid multiple error messages
+                        continue;
+                    }
+                }
+
+                if (spreadFieldTypeTag != TypeTags.RECORD) {
                     continue;
                 }
 
-                for (BField bField : ((BRecordType) spreadOpExpr.type).fields.values()) {
-                    if (Symbols.isOptional(bField.symbol)) {
+                BRecordType spreadExprRecordType = (BRecordType) spreadOpExprType;
+                boolean isSpreadExprRecordTypeSealed = spreadExprRecordType.sealed;
+                if (!isSpreadExprRecordTypeSealed) {
+                    // More than one spread-field with inclusive-type-descriptors are not allowed.
+                    if (inclusiveTypeSpreadField != null) {
+                        this.dlog.error(spreadOpExpr.pos, DiagnosticCode.MULTIPLE_INCLUSIVE_TYPES);
+                    } else {
+                        inclusiveTypeSpreadField = spreadOpField;
+                    }
+                }
+
+                LinkedHashMap<String, BField> fieldsInRecordType = spreadExprRecordType.fields;
+                for (Object fieldName : names) {
+                    if (!fieldsInRecordType.containsKey(fieldName) && !isSpreadExprRecordTypeSealed) {
+                        this.dlog.error(spreadOpExpr.pos,
+                                DiagnosticCode.SPREAD_FIELD_MAY_DULPICATE_ALREADY_SPECIFIED_KEYS,
+                                spreadOpExpr);
+                        break;
+                    }
+                }
+
+                for (BField bField : fieldsInRecordType.values()) {
+                    String name = bField.name.value;
+                    if (names.contains(name)) {
+                        if (bField.type.tag != TypeTags.NEVER) {
+                            this.dlog.error(spreadOpExpr.pos, DiagnosticCode.DUPLICATE_KEY_IN_RECORD_LITERAL_SPREAD_OP,
+                                    recordLiteral.type.getKind().typeName(), name, spreadOpField);
+                        }
                         continue;
                     }
 
-                    String name = bField.name.value;
-                    if (names.contains(name)) {
-                        this.dlog.error(spreadOpExpr.pos, DiagnosticCode.DUPLICATE_KEY_IN_RECORD_LITERAL_SPREAD_OP,
+                    if (bField.type.tag == TypeTags.NEVER) {
+                        neverTypedKeys.add(name);
+                        continue;
+                    }
+
+                    if (!neverTypedKeys.remove(name) &&
+                            inclusiveTypeSpreadField != null && isSpreadExprRecordTypeSealed) {
+                        this.dlog.error(spreadOpExpr.pos,
+                                        DiagnosticCode.POSSIBLE_DUPLICATE_OF_FIELD_SPECIFIED_VIA_SPREAD_OP,
                                         recordLiteral.expectedType.getKind().typeName(), name, spreadOpField);
                     }
                     names.add(name);
@@ -2281,6 +2376,9 @@ public class CodeAnalyzer extends BLangNodeVisitor {
                     if (names.contains(name)) {
                         this.dlog.error(keyExpr.pos, DiagnosticCode.DUPLICATE_KEY_IN_RECORD_LITERAL,
                                         recordLiteral.expectedType.getKind().typeName(), name);
+                    } else if (inclusiveTypeSpreadField != null && !neverTypedKeys.contains(name)) {
+                        this.dlog.error(keyExpr.pos, DiagnosticCode.POSSIBLE_DUPLICATE_OF_FIELD_SPECIFIED_VIA_SPREAD_OP,
+                                        name, inclusiveTypeSpreadField);
                     }
 
                     if (!isInferredRecordForMapCET && isOpenRecord && !((BRecordType) type).fields.containsKey(name)) {
@@ -2292,8 +2390,10 @@ public class CodeAnalyzer extends BLangNodeVisitor {
                     Object name = ((BLangLiteral) keyExpr).value;
                     if (names.contains(name)) {
                         this.dlog.error(keyExpr.pos, DiagnosticCode.DUPLICATE_KEY_IN_RECORD_LITERAL,
-                                        recordLiteral.parent.type.getKind().typeName(),
-                                        name);
+                                        recordLiteral.parent.type.getKind().typeName(), name);
+                    } else if (inclusiveTypeSpreadField != null && !neverTypedKeys.contains(name)) {
+                        this.dlog.error(keyExpr.pos, DiagnosticCode.POSSIBLE_DUPLICATE_OF_FIELD_SPECIFIED_VIA_SPREAD_OP,
+                                        name, inclusiveTypeSpreadField);
                     }
                     names.add(name);
                 }
@@ -2700,6 +2800,13 @@ public class CodeAnalyzer extends BLangNodeVisitor {
 
     public void visit(BLangLambdaFunction bLangLambdaFunction) {
         boolean isWorker = false;
+
+        if (bLangLambdaFunction.function.flagSet.contains(Flag.TRANSACTIONAL) &&
+                bLangLambdaFunction.function.flagSet.contains(Flag.WORKER) && !withinTransactionScope) {
+            dlog.error(bLangLambdaFunction.pos, DiagnosticCode.TRANSACTIONAL_WORKER_OUT_OF_TRANSACTIONAL_SCOPE,
+                    bLangLambdaFunction);
+            return;
+        }
         if (bLangLambdaFunction.parent.getKind() == NodeKind.VARIABLE) {
             String workerVarName = ((BLangSimpleVariable) bLangLambdaFunction.parent).name.value;
             if (workerVarName.startsWith(WORKER_LAMBDA_VAR_PREFIX)) {
@@ -2710,11 +2817,8 @@ public class CodeAnalyzer extends BLangNodeVisitor {
                                                                                   bLangLambdaFunction.function);
             }
         }
-
         boolean statementReturn = this.statementReturns;
-
         this.visitFunction(bLangLambdaFunction.function);
-
         this.statementReturns = statementReturn;
 
         if (isWorker) {
@@ -2864,6 +2968,7 @@ public class CodeAnalyzer extends BLangNodeVisitor {
 
     @Override
     public void visit(BLangCheckedExpr checkedExpr) {
+        this.failVisited = true;
         analyzeExpr(checkedExpr.expr);
 
         if (this.env.scope.owner.getKind() == SymbolKind.PACKAGE) {
@@ -2985,7 +3090,10 @@ public class CodeAnalyzer extends BLangNodeVisitor {
 
     @Override
     public void visit(BLangOnFailClause onFailClause) {
+        boolean currentFailVisited = this.failVisited;
+        this.failVisited = false;
         this.resetLastStatement();
+        this.resetErrorThrown();
         this.returnWithinLambdaWrappingCheckStack.push(false);
         BLangVariable onFailVarNode = (BLangVariable) onFailClause.variableDefinitionNode.getVariable();
         for (BType errorType : errorTypes.peek()) {
@@ -2995,8 +3103,11 @@ public class CodeAnalyzer extends BLangNodeVisitor {
             }
         }
         analyzeNode(onFailClause.body, env);
+        onFailClause.bodyContainsFail = this.failVisited;
         onFailClause.statementBlockReturns = this.returnWithinLambdaWrappingCheckStack.peek();
         this.returnWithinLambdaWrappingCheckStack.pop();
+        this.resetErrorThrown();
+        this.failVisited = currentFailVisited;
     }
 
     @Override

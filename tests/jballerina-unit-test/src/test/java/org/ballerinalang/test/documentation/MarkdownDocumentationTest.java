@@ -36,6 +36,7 @@ import org.wso2.ballerinalang.compiler.tree.BLangMarkdownReferenceDocumentation;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangConstant;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangMarkdownParameterDocumentation;
 import org.wso2.ballerinalang.compiler.tree.expressions.BLangMarkdownReturnParameterDocumentation;
+import org.wso2.ballerinalang.compiler.tree.types.BLangObjectTypeNode;
 import org.wso2.ballerinalang.compiler.util.TypeTags;
 
 import java.util.LinkedList;
@@ -365,7 +366,7 @@ public class MarkdownDocumentationTest {
         Assert.assertEquals(references.get(5).identifier, "baz");
     }
 
-    @Test(description = "Test doc negative cases.", groups = { "disableOnOldParser" })
+    @Test(description = "Test doc negative cases.", groups = { "disableOnOldParser" }, enabled = false)
     public void testDocumentationNegative() {
         CompileResult compileResult = BCompileUtil.compile("test-src/documentation/markdown_negative.bal");
         Assert.assertEquals(compileResult.getErrorCount(), 0);
@@ -426,7 +427,7 @@ public class MarkdownDocumentationTest {
         BAssertUtil.validateWarning(compileResult, index, "undocumented parameter 'filePath'", 117, 22);
     }
 
-    @Test(description = "Test doc service")
+    @Test(description = "Test doc service", enabled = false)
     public void testDocService() {
         CompileResult compileResult = BCompileUtil.compile("test-src/documentation/markdown_service.bal");
         Assert.assertEquals(compileResult.getErrorCount(), 0);
@@ -623,7 +624,7 @@ public class MarkdownDocumentationTest {
                 "    # ```");
     }
 
-    @Test(description = "Test doc multiple.", groups = { "disableOnOldParser" })
+    @Test(description = "Test doc multiple.", groups = { "disableOnOldParser" }, enabled = false)
     public void testMultiple() {
         CompileResult compileResult = BCompileUtil.compile("test-src/documentation/markdown_multiple.bal");
         Assert.assertEquals(compileResult.getErrorCount(), 0);
@@ -722,5 +723,21 @@ public class MarkdownDocumentationTest {
         Assert.assertEquals(parameters.size(), 1);
         Assert.assertEquals(parameters.get(0).getParameterName().getValue(), "f");
         Assert.assertEquals(parameters.get(0).getParameterDocumentation(), "documentation");
+    }
+
+    @Test(description = "Test on methods of object type def")
+    public void testMarkdownOnMethodOfObjectTypeDef() {
+        CompileResult compileResult = BCompileUtil.compile(
+                "test-src/documentation/markdown_on_method_object_type_def.bal");
+        Assert.assertEquals(compileResult.getErrorCount(), 0);
+        Assert.assertEquals(compileResult.getWarnCount(), 1);
+        BAssertUtil.validateWarning(compileResult, 0, "undocumented parameter 'i'", 4, 25);
+
+        PackageNode packageNode = compileResult.getAST();
+        TypeDefinition typeDefinition = packageNode.getTypeDefinitions().get(0);
+        BLangObjectTypeNode objectTypeNode = (BLangObjectTypeNode) typeDefinition.getTypeNode();
+        BLangFunction bLangFunction = objectTypeNode.functions.get(0);
+        BLangMarkdownDocumentation markdownDocumentationAttachment = bLangFunction.getMarkdownDocumentationAttachment();
+        Assert.assertEquals(markdownDocumentationAttachment.getDocumentation(), "This is the doc");
     }
 }

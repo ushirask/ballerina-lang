@@ -286,6 +286,96 @@ isolated function testIsolatedObjectFieldInitializers() {
     assertEquality("ballerina", c3.ob.k);
 }
 
+client class ClientClass {
+    int i = 1;
+
+    remote isolated function bar() {
+        self.i = 2;
+    }
+
+    isolated remote function baz(int j, string... s) returns int {
+        int tot = self.i + j;
+
+        foreach string strVal in s {
+            tot = tot + strVal.length();
+        }
+        return tot;
+    }
+}
+
+final string[] & readonly strArr = ["hello", "world"];
+
+isolated function testIsolationAnalysisWithRemoteMethods() {
+    ClientClass cc = new;
+
+    cc->bar();
+    assertEquality(2, cc.i);
+
+    int x = cc->baz(1);
+    assertEquality(3, x);
+
+    x = cc->baz(arr[2], "hello");
+    assertEquality(10, x);
+
+    x = cc->baz(arr[1], ...strArr);
+    assertEquality(14, x);
+}
+
+final map<int> & readonly intMap = {a: 1, b: 2};
+
+isolated function testIsolatedFunctionWithDefaultableParams() {
+    isolatedFunctionWithDefaultableParams();
+    
+    // https://github.com/ballerina-platform/ballerina-lang/issues/10639#issuecomment-699952927
+    //assertEquality(<int[]> [2, 3, 4, 1, 2], isolatedAnonFunctionWithDefaultableParams(true));
+    //assertEquality(<int[]> [1, 2], isolatedAnonFunctionWithDefaultableParams(false, y = [1, 2]));
+    //assertEquality(<int[]> [1, 2, 1, 2], isolatedAnonFunctionWithDefaultableParams(true, y = [1, 2]));
+
+    assertEquality(<int[]> [1, 2, 3, 4], isolatedAnonFunctionWithDefaultableParams(true, [1, 2], {c: 3, d: 4}));
+}
+
+isolated function isolatedFunctionWithDefaultableParams(int w = i, int[] x = getIntArray()) {
+    assertEquality(1, w);
+    assertEquality(<int[]> [1, 2, 3], x);
+}
+
+var isolatedAnonFunctionWithDefaultableParams =
+    isolated function (boolean b, int[] y = getMutableIntArray(), map<int> z = intMap) returns any {
+        if b {
+            foreach var val in z {
+                y.push(val);
+            }
+        }
+        return y;
+    };
+
+isolated class IsolatedClass {
+    final string a = "hello";
+    private int[] b = [1, 2];
+
+    isolated function getArray() returns int[] {
+        lock {
+            int[] x = self.b.clone();
+            x.push(self.a.length());
+            return x.clone();
+        }
+    }
+}
+
+final IsolatedClass isolatedObject = new;
+
+isolated function testAccessingFinalIsolatedObjectInIsolatedFunction() {
+    IsolatedClass cl = isolatedObject;
+    int[] arr = isolatedObject.getArray();
+
+    assertEquality(<int[]> [1, 2], arr);
+    assertEquality(<int[]> [1, 2], cl.getArray());
+}
+
+isolated function getIntArray() returns int[] => arr;
+
+isolated function getMutableIntArray() returns int[] => [2, 3, 4];
+
 isolated function assertEquality(any|error expected, any|error actual) {
     if expected is anydata && actual is anydata && expected == actual {
         return;

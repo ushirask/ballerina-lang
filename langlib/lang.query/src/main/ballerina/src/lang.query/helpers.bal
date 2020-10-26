@@ -13,8 +13,10 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
+
 import ballerina/lang.__internal as internal;
 import ballerina/lang.'xml;
+import ballerina/java;
 
 function createPipeline(
         (Type)[]|map<Type>|record{}|string|xml|table<map<Type>>|stream<Type, error?>|_Iterable collection,
@@ -81,43 +83,6 @@ function addStreamFunction(@tainted _StreamPipeline pipeline, @tainted _StreamFu
 
 function getStreamFromPipeline(_StreamPipeline pipeline) returns stream<Type, error?> {
     return pipeline.getStream();
-}
-
-function sortStream(stream<Type, error?> strm, @tainted Type[] arr, int lmt) returns stream<Type, error?> {
-    Type[] streamValArr = [];
-    record {| Type value; |}|error? v = strm.next();
-    while (v is record {| Type value; |}) {
-        streamValArr.push(v.value);
-        v = strm.next();
-    }
-
-    StreamOrderBy streamOrderByObj = new StreamOrderBy();
-    var sortedArr = <@untainted>streamOrderByObj.topDownMergeSort();
-
-    int i = 0;
-    int k = 0;
-    // Add the sorted stream values to arr
-    foreach var e in sortedArr {
-        if (!(lmt == 0) && (k == lmt)) {
-            break;
-        }
-        int j = 0;
-        while (j < streamValArr.length()) {
-            if (e is anydata[]) {
-                if (streamValArr[j] is map<anydata>|string|xml) {
-                    if (e[e.length()-1] == <map<anydata>|string|xml>streamValArr[j]) {
-                        arr[i] = streamValArr[j];
-                        var val = streamValArr.remove(j);
-                        i += 1;
-                    }
-                }
-            }
-            j += 1;
-        }
-        k += 1;
-    }
-
-    return arr.toStream();
 }
 
 function toArray(stream<Type, error?> strm, Type[] arr) returns Type[]|error {
@@ -187,37 +152,8 @@ function consumeStream(stream<Type, error?> strm) returns error? {
     }
 }
 
-// Check whether a float is NaN
-function checkNaN(float x) returns boolean = external;
-
 // TODO: This for debugging purposes, remove once completed.
-function print(any|error? data) = external;
-
-class IterHelper {
-    public _StreamPipeline pipeline;
-    public typedesc<Type> outputType;
-
-    function init(_StreamPipeline pipeline, typedesc<Type> outputType) {
-      self.pipeline = pipeline;
-      self.outputType = outputType;
-    }
-
-    public isolated function next() returns record {|Type value;|}|error? {
-        _StreamPipeline p = self.pipeline;
-        _Frame|error? f = p.next();
-        if (f is _Frame) {
-            Type v = <Type>f["$value$"];
-            // Add orderKey and orderDirection values to respective arrays.
-            if ((!(f["$orderKey$"] is ())) && (!(f["$orderDirection$"] is ()))) {
-                anydata[] orKey = <anydata[]>f["$orderKey$"];
-                // Need to keep the stream value to sort the stream.
-                orKey.push(<anydata>v);
-                orderFieldValsArr.push(orKey);
-                orderDirectionsArr = <boolean[]>f["$orderDirection$"];
-            }
-            return internal:setNarrowType(self.outputType, {value: v});
-        } else {
-            return f;
-        }
-    }
-}
+function print(any|error? data) = @java:Method {
+    'class: "org.ballerinalang.langlib.query.Print",
+    name: "print"
+} external;

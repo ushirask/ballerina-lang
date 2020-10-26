@@ -33,7 +33,7 @@ import org.wso2.ballerinalang.compiler.bir.writer.CPEntry.FloatCPEntry;
 import org.wso2.ballerinalang.compiler.bir.writer.CPEntry.IntegerCPEntry;
 import org.wso2.ballerinalang.compiler.bir.writer.CPEntry.PackageCPEntry;
 import org.wso2.ballerinalang.compiler.bir.writer.CPEntry.StringCPEntry;
-import org.wso2.ballerinalang.compiler.diagnostic.BallerinaDiagnosticLog;
+import org.wso2.ballerinalang.compiler.diagnostic.BLangDiagnosticLog;
 import org.wso2.ballerinalang.compiler.packaging.RepoHierarchy;
 import org.wso2.ballerinalang.compiler.semantics.analyzer.SymbolResolver;
 import org.wso2.ballerinalang.compiler.semantics.analyzer.TypeParamAnalyzer;
@@ -128,7 +128,7 @@ public class BIRPackageSymbolEnter {
     private final Names names;
     private final TypeParamAnalyzer typeParamAnalyzer;
     private final Types types;
-    private final BallerinaDiagnosticLog dlog;
+    private final BLangDiagnosticLog dlog;
     private BIRTypeReader typeReader;
 
     private BIRPackageSymbolEnv env;
@@ -161,7 +161,7 @@ public class BIRPackageSymbolEnter {
         this.names = Names.getInstance(context);
         this.typeParamAnalyzer = TypeParamAnalyzer.getInstance(context);
         this.types = Types.getInstance(context);
-        this.dlog = BallerinaDiagnosticLog.getInstance(context);
+        this.dlog = BLangDiagnosticLog.getInstance(context);
     }
 
     public BPackageSymbol definePackage(PackageID packageId,
@@ -374,11 +374,7 @@ public class BIRPackageSymbolEnter {
             invokableSymbol.name =
                     names.fromString(Symbols.getAttachedFuncSymbolName(attachedType.tsymbol.name.value, funcName));
             if (attachedType.tag == TypeTags.OBJECT || attachedType.tag == TypeTags.RECORD) {
-                if (attachedType.tag == TypeTags.OBJECT) {
-                    scopeToDefine = ((BObjectTypeSymbol) attachedType.tsymbol).methodScope;
-                } else {
-                    scopeToDefine = attachedType.tsymbol.scope;
-                }
+                scopeToDefine = attachedType.tsymbol.scope;
                 BAttachedFunction attachedFunc =
                         new BAttachedFunction(names.fromString(funcName), invokableSymbol, funcType,
                                               symTable.builtinPos);
@@ -1087,9 +1083,8 @@ public class BIRPackageSymbolEnter {
                 case TypeTags.TABLE:
                     BTableType bTableType = new BTableType(TypeTags.TABLE, null, symTable.tableType.tsymbol, flags);
                     bTableType.constraint = readTypeFromCp();
-                    boolean hasFieldNameList = inputStream.readByte() == 1;
-                    boolean hasKeyConstraint = inputStream.readByte() == 1;
 
+                    boolean hasFieldNameList = inputStream.readByte() == 1;
                     if (hasFieldNameList) {
                         bTableType.fieldNameList = new ArrayList<>();
                         int fieldNameListSize = inputStream.readInt();
@@ -1099,6 +1094,7 @@ public class BIRPackageSymbolEnter {
                         }
                     }
 
+                    boolean hasKeyConstraint = inputStream.readByte() == 1;
                     if (hasKeyConstraint) {
                         bTableType.keyTypeConstraint = readTypeFromCp();
                         if (bTableType.keyTypeConstraint.tsymbol == null) {
@@ -1279,7 +1275,6 @@ public class BIRPackageSymbolEnter {
                                                                                 env.pkgSymbol, symTable.builtinPos,
                                                                                 COMPILED_SOURCE);
                     objectSymbol.scope = new Scope(objectSymbol);
-                    objectSymbol.methodScope = new Scope(objectSymbol);
                     BObjectType objectType;
                     // Below is a temporary fix, need to fix this properly by using the type tag
                     if (service) {

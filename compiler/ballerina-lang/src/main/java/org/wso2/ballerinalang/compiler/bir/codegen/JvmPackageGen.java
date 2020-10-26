@@ -42,7 +42,7 @@ import org.wso2.ballerinalang.compiler.bir.model.BIRNode.BIRVariableDcl;
 import org.wso2.ballerinalang.compiler.bir.model.BIRNonTerminator.NewInstance;
 import org.wso2.ballerinalang.compiler.bir.model.VarKind;
 import org.wso2.ballerinalang.compiler.bir.model.VarScope;
-import org.wso2.ballerinalang.compiler.diagnostic.BallerinaDiagnosticLog;
+import org.wso2.ballerinalang.compiler.diagnostic.BLangDiagnosticLog;
 import org.wso2.ballerinalang.compiler.semantics.model.SymbolTable;
 import org.wso2.ballerinalang.compiler.semantics.model.symbols.BObjectTypeSymbol;
 import org.wso2.ballerinalang.compiler.semantics.model.symbols.BPackageSymbol;
@@ -126,9 +126,9 @@ public class JvmPackageGen {
     private Map<String, String> externClassMap;
     private Map<String, String> globalVarClassMap;
     private Map<String, PackageID> dependentModules;
-    private BallerinaDiagnosticLog dlog;
+    private BLangDiagnosticLog dlog;
 
-    JvmPackageGen(SymbolTable symbolTable, PackageCache packageCache, BallerinaDiagnosticLog dlog) {
+    JvmPackageGen(SymbolTable symbolTable, PackageCache packageCache, BLangDiagnosticLog dlog) {
 
         birFunctionMap = new HashMap<>();
         globalVarClassMap = new HashMap<>();
@@ -153,11 +153,22 @@ public class JvmPackageGen {
     }
 
     private static void addBuiltinImports(BIRPackage currentModule, Set<PackageID> dependentModuleArray) {
+        Name ballerinaOrgName = new Name("ballerina");
+        Name builtInVersion = new Name("");
+
         // Add the builtin and utils modules to the imported list of modules
         if (isSameModule(currentModule, PackageID.ANNOTATIONS)) {
             return;
         }
+
         dependentModuleArray.add(PackageID.ANNOTATIONS);
+
+        if (isSameModule(currentModule, PackageID.JAVA)) {
+            return;
+        }
+
+        dependentModuleArray.add(PackageID.JAVA);
+
         if (isLangModule(currentModule)) {
             return;
         }
@@ -201,7 +212,7 @@ public class JvmPackageGen {
         if (!BALLERINA.equals(moduleId.org.value)) {
             return false;
         }
-        return moduleId.name.value.indexOf("lang.") == 0;
+        return moduleId.name.value.indexOf("lang.") == 0 || moduleId.name.equals(Names.JAVA);
     }
 
     private static void generatePackageVariable(BIRGlobalVariableDcl globalVar, ClassWriter cw) {
@@ -574,7 +585,7 @@ public class JvmPackageGen {
             }
         }
 
-        globalVarClassMap.put(pkgName + "LOCK_STORE", initClass);
+        globalVarClassMap.put(pkgName + LOCK_STORE_VAR_NAME, initClass);
     }
 
     private void linkTypeDefinitions(BIRPackage module, String pkgName,

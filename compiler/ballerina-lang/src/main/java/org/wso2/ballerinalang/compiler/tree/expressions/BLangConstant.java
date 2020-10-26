@@ -132,4 +132,5 @@ public class BLangConstant extends BLangVariable implements ConstantNode, TypeDe
     public void setPrecedence(int precedence) {
         // Ignore
     }
+
 }

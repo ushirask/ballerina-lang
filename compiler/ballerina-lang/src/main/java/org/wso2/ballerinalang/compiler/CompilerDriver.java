@@ -24,7 +24,7 @@ import org.wso2.ballerinalang.compiler.bir.BIRGen;
 import org.wso2.ballerinalang.compiler.bir.codegen.CodeGenerator;
 import org.wso2.ballerinalang.compiler.desugar.ConstantPropagation;
 import org.wso2.ballerinalang.compiler.desugar.Desugar;
-import org.wso2.ballerinalang.compiler.diagnostic.BallerinaDiagnosticLog;
+import org.wso2.ballerinalang.compiler.diagnostic.BLangDiagnosticLog;
 import org.wso2.ballerinalang.compiler.semantics.analyzer.CodeAnalyzer;
 import org.wso2.ballerinalang.compiler.semantics.analyzer.CompilerPluginRunner;
 import org.wso2.ballerinalang.compiler.semantics.analyzer.DataflowAnalyzer;
@@ -57,6 +57,7 @@ import static org.ballerinalang.model.elements.PackageID.FLOAT;
 import static org.ballerinalang.model.elements.PackageID.FUTURE;
 import static org.ballerinalang.model.elements.PackageID.INT;
 import static org.ballerinalang.model.elements.PackageID.INTERNAL;
+import static org.ballerinalang.model.elements.PackageID.JAVA;
 import static org.ballerinalang.model.elements.PackageID.MAP;
 import static org.ballerinalang.model.elements.PackageID.OBJECT;
 import static org.ballerinalang.model.elements.PackageID.QUERY;
@@ -82,7 +83,7 @@ public class CompilerDriver {
             new CompilerContext.Key<>();
 
     private final CompilerOptions options;
-    private final BallerinaDiagnosticLog dlog;
+    private final BLangDiagnosticLog dlog;
     private final PackageLoader pkgLoader;
     private final PackageCache pkgCache;
     private final SymbolTable symbolTable;
@@ -115,7 +116,7 @@ public class CompilerDriver {
         context.put(COMPILER_DRIVER_KEY, this);
 
         this.options = CompilerOptions.getInstance(context);
-        this.dlog = BallerinaDiagnosticLog.getInstance(context);
+        this.dlog = BLangDiagnosticLog.getInstance(context);
         this.pkgLoader = PackageLoader.getInstance(context);
         this.pkgCache = PackageCache.getInstance(context);
         this.symbolTable = SymbolTable.getInstance(context);
@@ -147,6 +148,7 @@ public class CompilerDriver {
         // This logic interested in loading lang modules from source. For others we can load from balo.
         if (!LOAD_BUILTIN_FROM_SOURCE) {
             symbolTable.langAnnotationModuleSymbol = pkgLoader.loadPackageSymbol(ANNOTATIONS, null, null);
+            symbolTable.langJavaModuleSymbol = pkgLoader.loadPackageSymbol(JAVA, null, null);
             symbolTable.langInternalModuleSymbol = pkgLoader.loadPackageSymbol(INTERNAL, null, null);
             symResolver.reloadErrorAndDependentTypes();
             symResolver.reloadIntRangeType();
@@ -169,7 +171,6 @@ public class CompilerDriver {
             symbolTable.langQueryModuleSymbol = pkgLoader.loadPackageSymbol(QUERY, null, null);
             symbolTable.langTransactionModuleSymbol = pkgLoader.loadPackageSymbol(TRANSACTION, null, null);
             symbolTable.loadPredeclaredModules();
-            symResolver.loadFunctionalConstructors();
             return;
         }
 
@@ -187,6 +188,15 @@ public class CompilerDriver {
         symbolTable.langAnnotationModuleSymbol = pkgLoader.loadPackageSymbol(ANNOTATIONS, null, null);
 
         symResolver.reloadErrorAndDependentTypes();
+
+        if (langLib.equals(JAVA)) {
+            symbolTable.langJavaModuleSymbol = getLangModuleFromSource(JAVA);
+            return; // Nothing else to load.
+        }
+
+        // Other lang modules requires annotation module. Hence loading it first.
+        symbolTable.langJavaModuleSymbol = pkgLoader.loadPackageSymbol(JAVA, null, null);
+
 
         if (langLib.equals(INTERNAL)) {
             symbolTable.langInternalModuleSymbol = getLangModuleFromSource(INTERNAL);
