@@ -78,11 +78,12 @@ public class BallerinaTupleTypeSymbol extends AbstractTypeSymbol implements Tupl
 
         for (BTupleMember tupMember : tupMembers) {
             BVarSymbol bSymbol = tupMember.symbol;
+            BType bType = bSymbol.getType();
             this.tupleMembers.add(new BallerinaTupleMemberSymbol(
                     context,
-                    bSymbol.getType().name.getValue(),
+                    bType.name.getValue(),
                     bSymbol,
-                    typesFactory.getTypeDescriptor(bSymbol.getType())));
+                    typesFactory.getTypeDescriptor(bType)));
         }
 
         return this.tupleMembers;
