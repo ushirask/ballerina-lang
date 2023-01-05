@@ -18,11 +18,11 @@ package io.ballerina.compiler.api.impl.symbols;
 
 import io.ballerina.compiler.api.SymbolTransformer;
 import io.ballerina.compiler.api.SymbolVisitor;
+import io.ballerina.compiler.api.impl.SymbolFactory;
 import io.ballerina.compiler.api.symbols.TupleMemberSymbol;
 import io.ballerina.compiler.api.symbols.TupleTypeSymbol;
 import io.ballerina.compiler.api.symbols.TypeDescKind;
 import io.ballerina.compiler.api.symbols.TypeSymbol;
-import org.wso2.ballerinalang.compiler.semantics.model.symbols.BVarSymbol;
 import org.wso2.ballerinalang.compiler.semantics.model.types.BTupleMember;
 import org.wso2.ballerinalang.compiler.semantics.model.types.BTupleType;
 import org.wso2.ballerinalang.compiler.semantics.model.types.BType;
@@ -66,24 +66,15 @@ public class BallerinaTupleTypeSymbol extends AbstractTypeSymbol implements Tupl
     }
 
     @Override
-    public List<TupleMemberSymbol> tupleMembers() {
+    public List<TupleMemberSymbol> members() {
         if (this.tupleMembers != null) {
             return this.tupleMembers;
         }
 
-        TypesFactory typesFactory = TypesFactory.getInstance(this.context);
-
-        List<BTupleMember> tupMembers = ((BTupleType) this.getBType()).getTupleMembers();
+        SymbolFactory symbolFactory = SymbolFactory.getInstance(this.context);
         this.tupleMembers = new ArrayList<>();
-
-        for (BTupleMember tupMember : tupMembers) {
-            BVarSymbol bSymbol = tupMember.symbol;
-            BType bType = bSymbol.getType();
-            this.tupleMembers.add(new BallerinaTupleMemberSymbol(
-                    context,
-                    bType.name.getValue(),
-                    bSymbol,
-                    typesFactory.getTypeDescriptor(bType)));
+        for (BTupleMember tupMember : ((BTupleType) this.getBType()).getTupleMembers()) {
+            this.tupleMembers.add(symbolFactory.createTupleMember(tupMember.symbol));
         }
 
         return this.tupleMembers;
